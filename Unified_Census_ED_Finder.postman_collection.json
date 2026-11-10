@@ -1,0 +1,536 @@
+{
+  "info": {
+    "_postman_id": "adff4bbf-3fed-4a35-8368-7be19ec1591d",
+    "name": "Unified Census ED Finder (stevemorse.org)",
+    "description": "Postman collection for the **Unified Census ED Finder** by Stephen P. Morse & Joel D. Weintraub \u2014 https://stevemorse.org/census/unified.html\n\nTurns a historical address into a census **Enumeration District (ED)** for 1870\u20131950, so you can find the right census pages.\n\n**Unofficial.** These are the endpoints the finder's own web page calls; they're undocumented, return JSONP-wrapped HTML (each request has a script that parses it into a table in the *Visualize* tab), and could change without notice. Not affiliated with or endorsed by the authors. Please be polite with request volume and credit stevemorse.org.\n\n**Workflow:** set `census_year`, `state` \u2192 1 counties \u2192 2 cities \u2192 3 streets (copy exact street text) \u2192 4 find EDs \u2192 5/6 view pages & descriptions \u2192 7 (1940/1950) get scans from the National Archives.\n\nExample preloaded: 1910, Manhattan, block of W 11th St / W 12th St / 7th Ave (expected ED 30-160).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "item": [
+    {
+      "name": "1. List counties",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{morse_baseUrl}}/census/unifiedcounties.php?year={{census_year}}&state={{state}}",
+          "host": [
+            "{{morse_baseUrl}}"
+          ],
+          "path": [
+            "census",
+            "unifiedcounties.php"
+          ],
+          "query": [
+            {
+              "key": "year",
+              "value": "{{census_year}}",
+              "description": "1950, 1940, 1930, 1920, 1910, 1900, 1880 or 1870",
+              "disabled": false
+            },
+            {
+              "key": "state",
+              "value": "{{state}}",
+              "description": "2-letter state code, e.g. NY",
+              "disabled": false
+            }
+          ]
+        },
+        "description": "Counties available for a census year and state. Use the value in `county`."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Response is JSONP wrapping an HTML <option> list. Parse it into JSON.",
+              "const txt = pm.response.text();",
+              "const rows = [...txt.matchAll(/<option(?: value=\"([^\"]*)\")?>([^<]*)<\\/option>/g)]",
+              "  .map(m => ({ value: m[1] ?? m[2], label: m[2] }))",
+              "  .filter(r => r.label && !/^Other \\(specify\\)$/.test(r.label));",
+              "pm.test(\"Returned options\", () => pm.expect(rows.length).to.be.above(0));",
+              "console.log(rows);",
+              "pm.visualizer.set(`<style>body{font:13px system-ui}td,th{border:1px solid #ccc;padding:3px 6px;vertical-align:top}</style>",
+              "<p>{{rows.length}} results</p><table><tr><th>Label</th><th>Value</th></tr>",
+              "{{#each rows}}<tr><td>{{label}}</td><td>{{value}}</td></tr>{{/each}}</table>`, { rows });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. List cities",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{morse_baseUrl}}/census/unifiedcities.php?year={{census_year}}&state={{state}}&county={{county}}",
+          "host": [
+            "{{morse_baseUrl}}"
+          ],
+          "path": [
+            "census",
+            "unifiedcities.php"
+          ],
+          "query": [
+            {
+              "key": "year",
+              "value": "{{census_year}}",
+              "description": "1950, 1940, 1930, 1920, 1910, 1900, 1880 or 1870",
+              "disabled": false
+            },
+            {
+              "key": "state",
+              "value": "{{state}}",
+              "description": "2-letter state code, e.g. NY",
+              "disabled": false
+            },
+            {
+              "key": "county",
+              "value": "{{county}}",
+              "description": "County name from step 1 (optional \u2014 leave blank for every city in the state)",
+              "disabled": false
+            }
+          ]
+        },
+        "description": "Cities with street-level data. Use the code (e.g. `MA` = Manhattan) as `city_code` and the name as `city_name`."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Response is JSONP wrapping an HTML <option> list. Parse it into JSON.",
+              "const txt = pm.response.text();",
+              "const rows = [...txt.matchAll(/<option(?: value=\"([^\"]*)\")?>([^<]*)<\\/option>/g)]",
+              "  .map(m => ({ value: m[1] ?? m[2], label: m[2] }))",
+              "  .filter(r => r.label && !/^Other \\(specify\\)$/.test(r.label));",
+              "pm.test(\"Returned options\", () => pm.expect(rows.length).to.be.above(0));",
+              "console.log(rows);",
+              "pm.visualizer.set(`<style>body{font:13px system-ui}td,th{border:1px solid #ccc;padding:3px 6px;vertical-align:top}</style>",
+              "<p>{{rows.length}} results</p><table><tr><th>Label</th><th>Value</th></tr>",
+              "{{#each rows}}<tr><td>{{label}}</td><td>{{value}}</td></tr>{{/each}}</table>`, { rows });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. List streets in a city",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{morse_baseUrl}}/census/unifiedstreets.php?year={{census_year}}&state={{state}}&city={{city_code}}",
+          "host": [
+            "{{morse_baseUrl}}"
+          ],
+          "path": [
+            "census",
+            "unifiedstreets.php"
+          ],
+          "query": [
+            {
+              "key": "year",
+              "value": "{{census_year}}",
+              "description": "1950, 1940, 1930, 1920, 1910, 1900, 1880 or 1870",
+              "disabled": false
+            },
+            {
+              "key": "state",
+              "value": "{{state}}",
+              "description": "2-letter state code, e.g. NY",
+              "disabled": false
+            },
+            {
+              "key": "city",
+              "value": "{{city_code}}",
+              "description": "City code from step 2",
+              "disabled": false
+            }
+          ]
+        },
+        "description": "Every street indexed for the city, with the EDs each street passes through. Set the collection variable `street_filter` (e.g. `12th`) to narrow the table. Street names use the finder's own format, e.g. `12th W`, `7th Ave`, `Greenwich Ave`."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Each street's option value is the list of EDs that street passes through.",
+              "const txt = pm.response.text();",
+              "const rows = [...txt.matchAll(/<option value=\"([^\"]+)\">([^<]*)<\\/option>/g)]",
+              "  .map(m => ({ street: m[2], eds: m[1].split(\",\").length, edList: m[1] }));",
+              "const filter = (pm.collectionVariables.get(\"street_filter\") || \"\").toLowerCase();",
+              "const shown = filter ? rows.filter(r => r.street.toLowerCase().includes(filter)) : rows;",
+              "pm.test(\"Returned streets\", () => pm.expect(rows.length).to.be.above(0));",
+              "console.log(`${rows.length} streets; showing ${shown.length} matching \"${filter}\"`);",
+              "pm.visualizer.set(`<style>body{font:13px system-ui}td,th{border:1px solid #ccc;padding:3px 6px;vertical-align:top}</style>",
+              "<p>{{shown.length}} of {{total}} streets (filter: <b>{{filter}}</b> \u2014 set collection variable <code>street_filter</code>). Use the <b>Street</b> text exactly as shown in street1\u2013street5.</p>",
+              "<table><tr><th>Street (use this text)</th><th># EDs</th><th>ED numbers</th></tr>",
+              "{{#each shown}}<tr><td>{{street}}</td><td>{{eds}}</td><td>{{edList}}</td></tr>{{/each}}</table>`, { shown, total: rows.length, filter });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Find EDs for an address / intersection",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{morse_baseUrl}}/census/unified.php?year={{census_year}}&state={{state}}&county={{county}}&fullcity={{city_name}}&city={{city_code}}&other=0&prefix=&suffix=&details=no&street1={{street1}}&street2={{street2}}&street3={{street3}}&street4={{street4}}&street5=",
+          "host": [
+            "{{morse_baseUrl}}"
+          ],
+          "path": [
+            "census",
+            "unified.php"
+          ],
+          "query": [
+            {
+              "key": "year",
+              "value": "{{census_year}}",
+              "description": "1950, 1940, 1930, 1920, 1910, 1900, 1880 or 1870",
+              "disabled": false
+            },
+            {
+              "key": "state",
+              "value": "{{state}}",
+              "description": "2-letter state code, e.g. NY",
+              "disabled": false
+            },
+            {
+              "key": "county",
+              "value": "{{county}}",
+              "description": "",
+              "disabled": false
+            },
+            {
+              "key": "fullcity",
+              "value": "{{city_name}}",
+              "description": "City name, e.g. Manhattan",
+              "disabled": false
+            },
+            {
+              "key": "city",
+              "value": "{{city_code}}",
+              "description": "City code, e.g. MA",
+              "disabled": false
+            },
+            {
+              "key": "other",
+              "value": "0",
+              "description": "1 if the city was typed in (Other)",
+              "disabled": false
+            },
+            {
+              "key": "prefix",
+              "value": "",
+              "description": "1930 only: known 1930 ED prefix",
+              "disabled": false
+            },
+            {
+              "key": "suffix",
+              "value": "",
+              "description": "1930 only: known 1930 ED suffix",
+              "disabled": false
+            },
+            {
+              "key": "details",
+              "value": "no",
+              "description": "Keep `no` (yes returns an HTML map page)",
+              "disabled": false
+            },
+            {
+              "key": "street1",
+              "value": "{{street1}}",
+              "description": "Street the house is on \u2014 exact text from step 3",
+              "disabled": false
+            },
+            {
+              "key": "street2",
+              "value": "{{street2}}",
+              "description": "Cross street / back street",
+              "disabled": false
+            },
+            {
+              "key": "street3",
+              "value": "{{street3}}",
+              "description": "Optional",
+              "disabled": false
+            },
+            {
+              "key": "street4",
+              "value": "{{street4}}",
+              "description": "Optional",
+              "disabled": false
+            },
+            {
+              "key": "street5",
+              "value": "",
+              "description": "Optional",
+              "disabled": false
+            }
+          ]
+        },
+        "description": "Returns the EDs that contain **all** the streets you list. Enter the house's street plus the cross streets on each side of the block to narrow it to one or two EDs. Saves the first result to `{{ed}}` and all results to `{{ed_list}}`."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Response: EdCallback('<a href=...LinkClicked(\"30-160\")...>New York-160</a>, ...', 'County')",
+              "const txt = pm.response.text();",
+              "const eds = [...txt.matchAll(/LinkClicked\\(\"([^\"]+)\"\\);?\\\\?'>([^<]*)<\\/a>/g)]",
+              "  .map(m => ({ ed: m[1], label: m[2] }));",
+              "pm.test(\"Found at least one ED\", () => pm.expect(eds.length).to.be.above(0));",
+              "pm.collectionVariables.set(\"ed_list\", eds.map(e => e.ed).join(\",\"));",
+              "if (eds.length) {",
+              "  pm.collectionVariables.set(\"ed\", eds[0].ed);",
+              "  pm.collectionVariables.set(\"ed_county\", eds[0].ed.split(\"-\")[0]);",
+              "  pm.collectionVariables.set(\"ed_number\", eds[0].ed.split(\"-\")[1]);",
+              "}",
+              "console.log(\"EDs:\", eds.map(e => e.ed).join(\", \"));",
+              "pm.visualizer.set(`<style>body{font:13px system-ui}td,th{border:1px solid #ccc;padding:3px 6px}</style>",
+              "<p><b>{{eds.length}}</b> enumeration district(s) contain all the streets you entered.",
+              "First ED saved to <code>{{\"{{\"}}ed{{\"}}\"}}</code>.</p>",
+              "<table><tr><th>ED (county-ED)</th><th>Label</th></tr>{{#each eds}}<tr><td>{{ed}}</td><td>{{label}}</td></tr>{{/each}}</table>`, { eds });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. View census pages for ED (opens in browser)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{morse_baseUrl}}/census/reelframes.html?year={{census_year}}&state={{state}}&county={{ed_county}}&ed={{ed_number}}",
+          "host": [
+            "{{morse_baseUrl}}"
+          ],
+          "path": [
+            "census",
+            "reelframes.html"
+          ],
+          "query": [
+            {
+              "key": "year",
+              "value": "{{census_year}}",
+              "description": "1950, 1940, 1930, 1920, 1910, 1900, 1880 or 1870",
+              "disabled": false
+            },
+            {
+              "key": "state",
+              "value": "{{state}}",
+              "description": "2-letter state code, e.g. NY",
+              "disabled": false
+            },
+            {
+              "key": "county",
+              "value": "{{ed_county}}",
+              "description": "",
+              "disabled": false
+            },
+            {
+              "key": "ed",
+              "value": "{{ed_number}}",
+              "description": "",
+              "disabled": false
+            }
+          ]
+        },
+        "description": "1880\u20131930: page that links to the microfilm reel/frames for this ED. Open the URL in a browser (it's a JavaScript page). For 1940/1950 use `census/viewer1940.html` / `viewer1950.html` with the same parameters, or the NARA request below."
+      },
+      "response": []
+    },
+    {
+      "name": "6. ED description / transcription (opens in browser)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{morse_baseUrl}}/ed/ed2_pre.php?year={{census_year}}&state={{state}}&ed={{ed}}",
+          "host": [
+            "{{morse_baseUrl}}"
+          ],
+          "path": [
+            "ed",
+            "ed2_pre.php"
+          ],
+          "query": [
+            {
+              "key": "year",
+              "value": "{{census_year}}",
+              "description": "1950, 1940, 1930, 1920, 1910, 1900, 1880 or 1870",
+              "disabled": false
+            },
+            {
+              "key": "state",
+              "value": "{{state}}",
+              "description": "2-letter state code, e.g. NY",
+              "disabled": false
+            },
+            {
+              "key": "ed",
+              "value": "{{ed}}",
+              "description": "",
+              "disabled": false
+            }
+          ]
+        },
+        "description": "Transcribed boundary description for the ED (pre-1930). For 1930+ change the path to `ed/ed2.php`. Rendered by JavaScript \u2014 open in a browser."
+      },
+      "response": []
+    },
+    {
+      "name": "7. NARA Catalog: find this ED's scans (1940/1950 only)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{nara_baseUrl}}/records/search?q=\"ED {{ed}}\"&ancestorNaId=43290879&levelOfDescription=item&limit=10",
+          "host": [
+            "{{nara_baseUrl}}"
+          ],
+          "path": [
+            "records",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "\"ED {{ed}}\"",
+              "description": "Exact ED, e.g. \"ED 31-1910\"",
+              "disabled": false
+            },
+            {
+              "key": "ancestorNaId",
+              "value": "43290879",
+              "description": "43290879 = 1950 schedules, 16660414 = 1940",
+              "disabled": false
+            },
+            {
+              "key": "levelOfDescription",
+              "value": "item",
+              "description": "",
+              "disabled": false
+            },
+            {
+              "key": "limit",
+              "value": "10",
+              "description": "",
+              "disabled": false
+            }
+          ]
+        },
+        "description": "Hands the ED off to the National Archives Catalog API to get the page images. Only 1940 and 1950 are indexed by ED there. Requires `nara_api_key` (collection variable).",
+        "auth": {
+          "type": "apikey",
+          "apikey": [
+            {
+              "key": "key",
+              "value": "x-api-key",
+              "type": "string"
+            },
+            {
+              "key": "value",
+              "value": "{{nara_api_key}}",
+              "type": "string"
+            },
+            {
+              "key": "in",
+              "value": "header",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "morse_baseUrl",
+      "value": "https://stevemorse.org"
+    },
+    {
+      "key": "census_year",
+      "value": "1910"
+    },
+    {
+      "key": "state",
+      "value": "NY"
+    },
+    {
+      "key": "county",
+      "value": "New York"
+    },
+    {
+      "key": "city_code",
+      "value": "MA"
+    },
+    {
+      "key": "city_name",
+      "value": "Manhattan"
+    },
+    {
+      "key": "street1",
+      "value": "11th W"
+    },
+    {
+      "key": "street2",
+      "value": "12th W"
+    },
+    {
+      "key": "street3",
+      "value": "7th Ave"
+    },
+    {
+      "key": "street4",
+      "value": ""
+    },
+    {
+      "key": "street_filter",
+      "value": "12th"
+    },
+    {
+      "key": "ed",
+      "value": ""
+    },
+    {
+      "key": "ed_list",
+      "value": ""
+    },
+    {
+      "key": "ed_county",
+      "value": ""
+    },
+    {
+      "key": "ed_number",
+      "value": ""
+    },
+    {
+      "key": "nara_baseUrl",
+      "value": "https://catalog.archives.gov/api/v2"
+    },
+    {
+      "key": "nara_api_key",
+      "value": ""
+    }
+  ]
+}
